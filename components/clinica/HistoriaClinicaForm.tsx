@@ -136,37 +136,49 @@ export function HistoriaClinicaForm({ paciente }: { paciente: any }) {
       {/* SECCIÓN 1: FICHA DE IDENTIFICACIÓN */}
       <div className={printSectionStyle}>
         <h2 className={sectionTitleStyle}>1. Ficha de Identificación</h2>
+        
+        {/* PROTAGONISMO DEL NOMBRE DEL PACIENTE */}
+        <div className="mb-6 bg-umi-blue/5 p-4 rounded-xl border border-umi-blue/10 print:bg-transparent print:border-none print:p-0 print:mb-4 print:border-b print:border-zinc-300 print:rounded-none">
+          <Label className="text-umi-blue font-bold uppercase tracking-wider text-xs print:text-[10px]">Nombre Completo del Paciente</Label>
+          <Input 
+            disabled={isGuardado} 
+            defaultValue={paciente.nombre_completo} 
+            placeholder="Ej. Ana Pérez Gómez"
+            className="text-2xl md:text-3xl font-black text-zinc-900 border-none bg-transparent shadow-none px-0 h-12 focus-visible:ring-0 print:text-xl print:h-auto print:p-0 mt-1 placeholder:text-zinc-300 disabled:opacity-100" 
+          />
+        </div>
+
+        {/* RESTO DE LA FICHA EN CUADRÍCULA */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:grid-cols-4 print:gap-2">
           <div className="space-y-1"><Label className={printLabelStyle}>Folio</Label><Input readOnly value={folioAuto} className={`bg-zinc-100 font-bold text-umi-blue ${printInputStyle}`} /></div>
           <div className="space-y-1"><Label className={printLabelStyle}>Fecha de Elaboración</Label><Input readOnly value={fechaHoy} className={`bg-zinc-100 ${printInputStyle}`} /></div>
-          <div className="space-y-1 md:col-span-2 print:col-span-2"><Label className={printLabelStyle}>Nombre Completo</Label><Input disabled={isGuardado} defaultValue={paciente.nombre_completo} className={printInputStyle} /></div>
-          
           <div className="space-y-1"><Label className={printLabelStyle}>Edad</Label><Input disabled={isGuardado} defaultValue={paciente.edad} className={printInputStyle} /></div>
           <div className="space-y-1"><Label className={printLabelStyle}>Sexo</Label><Input disabled={isGuardado} defaultValue={paciente.genero} className={printInputStyle} /></div>
+          
           <div className="space-y-1"><Label className={printLabelStyle}>Ocupación</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
           <div className="space-y-1"><Label className={printLabelStyle}>Estado Civil</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-
           <div className="space-y-1"><Label className={printLabelStyle}>Teléfono</Label><Input disabled={isGuardado} defaultValue={paciente.telefono} className={printInputStyle} /></div>
           <div className="space-y-1"><Label className={printLabelStyle}>Correo</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
+          
           <div className="space-y-1"><Label className={printLabelStyle}>No. Seguridad Social</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
           <div className="space-y-1"><Label className={printLabelStyle}>Contacto de Emergencia</Label><Input disabled={isGuardado} placeholder="Nombre y Tel" className={printInputStyle} /></div>
-
           <div className="space-y-1"><Label className={printLabelStyle}>Señas Distintivas</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
           <div className="space-y-1"><Label className={printLabelStyle}>Tipo de Sangre</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
+          
           <div className="space-y-1"><Label className={printLabelStyle}>Alergias</Label><Input disabled={isGuardado} className={`${printInputStyle} border-red-200`} /></div>
           <div className="space-y-1"><Label className={printLabelStyle}>Religión</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-
           <div className="space-y-1 md:col-span-2 print:col-span-2"><Label className={printLabelStyle}>Originario / Domicilio</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
+          
           <div className="space-y-1"><Label className={printLabelStyle}>Escolaridad</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
           <div className="space-y-1"><Label className={printLabelStyle}>Servicio</Label><Input disabled={isGuardado} defaultValue="Fisioterapia" className={printInputStyle} /></div>
-
           <div className="space-y-1"><Label className={printLabelStyle}>Tipo de Interrogatorio</Label>
             <select disabled={isGuardado} className={`flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 ${printInputStyle}`}>
               <option>Directo</option><option>Indirecto</option><option>Mixto</option><option>Urgencia</option>
             </select>
           </div>
           <div className="space-y-1"><Label className={printLabelStyle}>Referido de</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1 md:col-span-2 print:col-span-2"><Label className={printLabelStyle}>Dx Médico de Envío</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
+          
+          <div className="space-y-1 md:col-span-4 print:col-span-4"><Label className={printLabelStyle}>Dx Médico de Envío</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
         </div>
       </div>
 
@@ -318,10 +330,8 @@ export function HistoriaClinicaForm({ paciente }: { paciente: any }) {
                     <div className="hidden print:block flex-1 text-[10px] border-b border-zinc-300">{item.valor || "No evaluado"}</div>
                   </>
                ) : (
-                  // Render para el resto de las escalas
                   <div className="flex-1 flex items-center gap-2">
                     <Input disabled={isGuardado} placeholder="Puntaje/resultado" value={item.valor} onChange={e => updateEscala(item.nombre, e.target.value)} className={`flex-1 h-8 text-xs ${printInputStyle}`} />
-                    {/* Aquí se muestra la equivalencia/unidad obtenida del diccionario */}
                     <span className="text-[10px] text-zinc-400 shrink-0">{ESCALAS_HINTS[item.nombre] || ""}</span>
                   </div>
                )}
