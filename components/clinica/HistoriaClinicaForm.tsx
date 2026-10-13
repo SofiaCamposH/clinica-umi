@@ -1,53 +1,24 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Save, Eraser, Printer, Lock, CheckCircle2, Plus, X } from "lucide-react";
+import { Save, Eraser, Printer, Lock, CheckCircle2, Plus, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import SignatureCanvas from "react-signature-canvas";
 import Image from "next/image";
+import { createClient } from "@/lib/supabase/client";
 
-// --- LISTAS DE OPCIONES ---
-const AHF_LIST = [
-  "Cáncer", "Hipertensión / Cardiopatías", "Diabetes / Metabólicas", 
-  "Artritis", "Lupus", "Hiper / Hipotiroidismo", "Asma / Respiratorias / EPOC", 
-  "Distrofia", "Esclerosis Múltiple / ELA", "Parkinson", "Marfan", "Steinert", "Huntington"
-];
-
-const APP_LIST = [
-  "Cirugías", "Fracturas", "Esguinces", "Desgarres", 
-  "Luxaciones", "Enf. Crónico Degenerativas", "Alergias", "Transfusiones"
-];
-
-const ESCALAS_LIST = [
-  "EVA", "Daniels", "Braden", "Tampa Scale", "Barthel", "FIM", "SF-36", 
-  "Pruebas de Esfuerzo", "Caminata 6 min", "RM", "Escala de Berg", 
-  "Tinetti", "Ashworth", "Campbell", "Tardieu", "Denver"
-];
-
-// --- DICCIONARIO DE UNIDADES / EQUIVALENCIAS ---
-const ESCALAS_HINTS: Record<string, string> = {
-  "Braden": "pts (Riesgo úlceras)",
-  "Tampa Scale": "pts / 68",
-  "Barthel": "pts / 100",
-  "FIM": "pts / 126",
-  "SF-36": "puntos",
-  "Pruebas de Esfuerzo": "BPM / METs",
-  "Caminata 6 min": "metros",
-  "RM": "kg / lbs",
-  "Escala de Berg": "pts / 56",
-  "Tinetti": "pts / 28",
-  "Ashworth": "Grado (0-4)",
-  "Campbell": "Grado (-3 a +3)",
-  "Tardieu": "Grado (0-5)",
-  "Denver": "Normal/Dudoso/Anormal"
-};
+const AHF_LIST = ["Cáncer", "Hipertensión / Cardiopatías", "Diabetes / Metabólicas", "Artritis", "Lupus", "Hiper / Hipotiroidismo", "Asma / Respiratorias / EPOC", "Distrofia", "Esclerosis Múltiple / ELA", "Parkinson", "Marfan", "Steinert", "Huntington"];
+const APP_LIST = ["Cirugías", "Fracturas", "Esguinces", "Desgarres", "Luxaciones", "Enf. Crónico Degenerativas", "Alergias", "Transfusiones"];
+const ESCALAS_LIST = ["EVA", "Daniels", "Braden", "Tampa Scale", "Barthel", "FIM", "SF-36", "Pruebas de Esfuerzo", "Caminata 6 min", "RM", "Escala de Berg", "Tinetti", "Ashworth", "Campbell", "Tardieu", "Denver"];
+const ESCALAS_HINTS: Record<string, string> = { "Braden": "pts", "Tampa Scale": "pts/68", "Barthel": "pts/100", "FIM": "pts/126", "SF-36": "pts", "Pruebas de Esfuerzo": "METs", "Caminata 6 min": "mts", "RM": "kg", "Escala de Berg": "pts/56", "Tinetti": "pts/28", "Ashworth": "Grado 0-4", "Campbell": "Grado -3 a 3", "Tardieu": "Grado 0-5", "Denver": "Normal/Anormal" };
 
 type ItemDinamico = { nombre: string; valor: string };
 
 export function HistoriaClinicaForm({ paciente }: { paciente: any }) {
+  const supabase = createClient();
   const sigPadPaciente = useRef<any>(null);
   const limpiarFirmaPaciente = () => sigPadPaciente.current?.clear();
 
@@ -56,12 +27,14 @@ export function HistoriaClinicaForm({ paciente }: { paciente: any }) {
   const [pin, setPin] = useState("");
   const [fisioFirmado, setFisioFirmado] = useState(false);
   const [errorPin, setErrorPin] = useState(false);
+  
+  // Estados de Guardado Real
+  const [isGuardando, setIsGuardando] = useState(false);
   const [isGuardado, setIsGuardado] = useState(false);
 
   const [ahfItems, setAhfItems] = useState<ItemDinamico[]>([]);
   const [appItems, setAppItems] = useState<ItemDinamico[]>([]);
   const [escalaItems, setEscalaItems] = useState<ItemDinamico[]>([]);
-  
   const [ahfSelect, setAhfSelect] = useState("");
   const [appSelect, setAppSelect] = useState("");
   const [escalaSelect, setEscalaSelect] = useState("");
@@ -71,30 +44,25 @@ export function HistoriaClinicaForm({ paciente }: { paciente: any }) {
   useEffect(() => {
     const hoy = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
     setFechaHoy(hoy);
-    if (!paciente.folio || paciente.folio.includes("generará")) {
-      const random = Math.floor(1000 + Math.random() * 9000);
-      setFolioAuto(`PAC-${new Date().getFullYear()}-${random}`);
+    if (!paciente?.folio || paciente.folio.includes("generará")) {
+      setFolioAuto(`PAC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
     } else {
       setFolioAuto(paciente.folio);
     }
   }, [paciente]);
 
   const agregarAhf = () => { if(ahfSelect) { setAhfItems([...ahfItems, {nombre: ahfSelect, valor: ""}]); setAhfSelect(""); } };
-  const removerAhf = (nombre: string) => setAhfItems(ahfItems.filter(x => x.nombre !== nombre));
   const updateAhf = (nombre: string, valor: string) => setAhfItems(ahfItems.map(x => x.nombre === nombre ? {...x, valor} : x));
-
+  
   const agregarApp = () => { if(appSelect) { setAppItems([...appItems, {nombre: appSelect, valor: ""}]); setAppSelect(""); } };
-  const removerApp = (nombre: string) => setAppItems(appItems.filter(x => x.nombre !== nombre));
   const updateApp = (nombre: string, valor: string) => setAppItems(appItems.map(x => x.nombre === nombre ? {...x, valor} : x));
 
   const agregarEscala = () => { 
     if(escalaSelect) { 
-      const valorInicial = escalaSelect === "EVA" ? "0" : "";
-      setEscalaItems([...escalaItems, {nombre: escalaSelect, valor: valorInicial}]); 
+      setEscalaItems([...escalaItems, {nombre: escalaSelect, valor: escalaSelect === "EVA" ? "0" : ""}]); 
       setEscalaSelect(""); 
     } 
   };
-  const removerEscala = (nombre: string) => setEscalaItems(escalaItems.filter(x => x.nombre !== nombre));
   const updateEscala = (nombre: string, valor: string) => setEscalaItems(escalaItems.map(x => x.nombre === nombre ? {...x, valor} : x));
 
   const handleFirmaFisio = () => {
@@ -102,10 +70,55 @@ export function HistoriaClinicaForm({ paciente }: { paciente: any }) {
     else { setErrorPin(true); setPin(""); }
   };
 
-  const handleGuardar = (e: React.FormEvent) => {
+  // --- LÓGICA DE GUARDADO REAL A SUPABASE ---
+  const handleGuardar = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!fisioFirmado) { alert("El fisioterapeuta debe firmar con su PIN antes de guardar."); return; }
-    setIsGuardado(true);
+    
+    setIsGuardando(true);
+
+    // 1. Recolectar todos los inputs nativos que tengan la propiedad 'name'
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
+
+    // 2. Empaquetar todo el documento clínico en un JSON
+    const historiaJson = {
+      ...data,
+      antecedentes_familiares: ahfItems,
+      antecedentes_personales: appItems,
+      escalas_aplicadas: escalaItems,
+      fecha_elaboracion: fechaHoy
+    };
+
+    // 3. Determinar si es un paciente existente (Update) o uno nuevo (Insert)
+    if (paciente && paciente.id) {
+      const { error } = await supabase
+        .from('pacientes')
+        .update({ historia_clinica: historiaJson })
+        .eq('id', paciente.id);
+
+      if (error) alert("Error al guardar: " + error.message);
+      else setIsGuardado(true);
+
+    } else {
+      // Es un paciente completamente nuevo (Desde /nueva-historia)
+      const { error } = await supabase
+        .from('pacientes')
+        .insert([{
+          folio: folioAuto,
+          nombre_completo: data.nombre_completo,
+          edad: parseInt(data.edad as string) || 0,
+          genero: data.genero,
+          telefono: data.telefono,
+          estatus_clinico: 'En valoración',
+          historia_clinica: historiaJson
+        }]);
+
+      if (error) alert("Error al guardar: " + error.message);
+      else setIsGuardado(true);
+    }
+
+    setIsGuardando(false);
   };
 
   const handlePrint = () => window.print();
@@ -113,309 +126,201 @@ export function HistoriaClinicaForm({ paciente }: { paciente: any }) {
   const printInputStyle = "print:border-b print:border-x-0 print:border-t-0 print:border-zinc-300 print:bg-transparent print:p-0 print:h-auto print:text-xs print:font-medium disabled:opacity-100 print:rounded-none";
   const printLabelStyle = "print:text-[10px] print:text-zinc-500 print:mb-0";
   const printSectionStyle = "bg-white p-6 rounded-xl border border-zinc-200 shadow-sm print:p-0 print:border-none print:shadow-none print:mt-4 print:break-inside-avoid";
-  const sectionTitleStyle = "text-lg font-bold text-umi-blue mb-4 border-b border-zinc-200 pb-2 print:text-sm print:mb-2 print:border-b-2 print:border-umi-blue";
 
   return (
     <form onSubmit={handleGuardar} className="space-y-6 pb-10 bg-white print:m-0 print:p-0">
       
-      {/* MEMBRETE PARA PDF */}
+      {/* MEMBRETE PDF */}
       <div className="hidden print:flex flex-col items-center justify-center border-b-2 border-umi-blue pb-4 mb-2">
         <div className="flex justify-between items-center w-full">
           <div className="relative h-14 w-32"><Image src="/logo-umi.png" alt="Logo UMI" fill className="object-contain object-left" priority /></div>
           <div className="text-right text-[10px] text-zinc-600">
             <p className="font-bold text-umi-blue text-xs">UNIDAD MÉDICA INTERDISCIPLINARIA</p>
-            <p>Clínica de Fisioterapia, Rehabilitación y Medicina Física</p>
-            <p>Av. Insurgentes Sur 1450, Col. Actipan, CDMX | Tel: (55) 5684-2910</p>
+            <p>Clínica de Fisioterapia y Rehabilitación | Av. Insurgentes Sur 1450, CDMX</p>
           </div>
         </div>
-        <h1 className="text-base font-bold mt-2 uppercase text-center bg-zinc-100 w-full py-1 text-umi-blue">
-          Historia Clínica Fisioterapéutica
-        </h1>
+        <h1 className="text-base font-bold mt-2 uppercase text-center bg-zinc-100 w-full py-1 text-umi-blue">Historia Clínica Fisioterapéutica</h1>
       </div>
 
-      {/* SECCIÓN 1: FICHA DE IDENTIFICACIÓN */}
+      {/* 1. FICHA DE IDENTIFICACIÓN */}
       <div className={printSectionStyle}>
-        <h2 className={sectionTitleStyle}>1. Ficha de Identificación</h2>
-        
-        {/* PROTAGONISMO DEL NOMBRE DEL PACIENTE */}
         <div className="mb-6 bg-umi-blue/5 p-4 rounded-xl border border-umi-blue/10 print:bg-transparent print:border-none print:p-0 print:mb-4 print:border-b print:border-zinc-300 print:rounded-none">
           <Label className="text-umi-blue font-bold uppercase tracking-wider text-xs print:text-[10px]">Nombre Completo del Paciente</Label>
-          <Input 
-            disabled={isGuardado} 
-            defaultValue={paciente.nombre_completo} 
-            placeholder="Ej. Ana Pérez Gómez"
-            className="text-2xl md:text-3xl font-black text-zinc-900 border-none bg-transparent shadow-none px-0 h-12 focus-visible:ring-0 print:text-xl print:h-auto print:p-0 mt-1 placeholder:text-zinc-300 disabled:opacity-100" 
-          />
+          <Input name="nombre_completo" required disabled={isGuardado} defaultValue={paciente?.nombre_completo} placeholder="Ej. Ana Pérez Gómez" className="text-2xl md:text-3xl font-black text-zinc-900 border-none bg-transparent shadow-none px-0 h-12 focus-visible:ring-0 print:text-xl print:h-auto print:p-0 mt-1" />
         </div>
-
-        {/* RESTO DE LA FICHA EN CUADRÍCULA */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:grid-cols-4 print:gap-2">
           <div className="space-y-1"><Label className={printLabelStyle}>Folio</Label><Input readOnly value={folioAuto} className={`bg-zinc-100 font-bold text-umi-blue ${printInputStyle}`} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Fecha de Elaboración</Label><Input readOnly value={fechaHoy} className={`bg-zinc-100 ${printInputStyle}`} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Edad</Label><Input disabled={isGuardado} defaultValue={paciente.edad} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Sexo</Label><Input disabled={isGuardado} defaultValue={paciente.genero} className={printInputStyle} /></div>
-          
-          <div className="space-y-1"><Label className={printLabelStyle}>Ocupación</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Estado Civil</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Teléfono</Label><Input disabled={isGuardado} defaultValue={paciente.telefono} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Correo</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          
-          <div className="space-y-1"><Label className={printLabelStyle}>No. Seguridad Social</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Contacto de Emergencia</Label><Input disabled={isGuardado} placeholder="Nombre y Tel" className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Señas Distintivas</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Tipo de Sangre</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          
-          <div className="space-y-1"><Label className={printLabelStyle}>Alergias</Label><Input disabled={isGuardado} className={`${printInputStyle} border-red-200`} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Religión</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1 md:col-span-2 print:col-span-2"><Label className={printLabelStyle}>Originario / Domicilio</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          
-          <div className="space-y-1"><Label className={printLabelStyle}>Escolaridad</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Servicio</Label><Input disabled={isGuardado} defaultValue="Fisioterapia" className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Tipo de Interrogatorio</Label>
-            <select disabled={isGuardado} className={`flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 ${printInputStyle}`}>
-              <option>Directo</option><option>Indirecto</option><option>Mixto</option><option>Urgencia</option>
-            </select>
-          </div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Referido de</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          
-          <div className="space-y-1 md:col-span-4 print:col-span-4"><Label className={printLabelStyle}>Dx Médico de Envío</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Fecha</Label><Input readOnly value={fechaHoy} className={`bg-zinc-100 ${printInputStyle}`} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Edad</Label><Input name="edad" disabled={isGuardado} defaultValue={paciente?.edad} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Sexo</Label><Input name="genero" disabled={isGuardado} defaultValue={paciente?.genero} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Ocupación</Label><Input name="ocupacion" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Estado Civil</Label><Input name="estado_civil" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Teléfono</Label><Input name="telefono" disabled={isGuardado} defaultValue={paciente?.telefono} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Correo</Label><Input name="correo" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>NSS</Label><Input name="nss" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Emergencia</Label><Input name="contacto_emergencia" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Señas / Sangre</Label><Input name="senas_sangre" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Alergias</Label><Input name="alergias" disabled={isGuardado} className={`${printInputStyle} border-red-200`} /></div>
+          <div className="space-y-1 md:col-span-2 print:col-span-2"><Label className={printLabelStyle}>Domicilio</Label><Input name="domicilio" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Tipo Interrogatorio</Label><Input name="tipo_interrogatorio" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Dx Médico</Label><Input name="dx_medico" disabled={isGuardado} className={printInputStyle} /></div>
         </div>
       </div>
 
-      {/* SECCIÓN 2 y 3: AHF Y APP (Listas Dinámicas) */}
+      {/* 2 Y 3. AHF Y APP (Listas Dinámicas) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2 print:gap-4 print:mt-4">
         <div className={printSectionStyle.replace("mt-4","")}>
-          <h2 className={sectionTitleStyle}>2. Antecedentes Heredofamiliares</h2>
+          <h2 className="text-lg font-bold text-umi-blue border-b pb-2 mb-4 print:text-sm">2. Antecedentes Familiares</h2>
           {!isGuardado && (
             <div className="flex gap-2 mb-4 print:hidden">
-              <select value={ahfSelect} onChange={e => setAhfSelect(e.target.value)} className="flex-1 rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm">
-                <option value="">Añadir antecedente...</option>
-                {AHF_LIST.filter(item => !ahfItems.some(x => x.nombre === item)).map(item => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <Button type="button" onClick={agregarAhf} variant="outline" size="icon" className="shrink-0"><Plus className="h-4 w-4 text-umi-blue" /></Button>
+              <select value={ahfSelect} onChange={e => setAhfSelect(e.target.value)} className="flex-1 rounded-md border border-zinc-200 px-3 py-1 text-sm"><option value="">Añadir...</option>{AHF_LIST.filter(i => !ahfItems.some(x => x.nombre === i)).map(i => <option key={i} value={i}>{i}</option>)}</select>
+              <Button type="button" onClick={agregarAhf} variant="outline" size="icon"><Plus className="h-4 w-4"/></Button>
             </div>
           )}
           <div className="space-y-2">
-            {ahfItems.length === 0 && <p className="text-xs text-zinc-400 italic">Ningún antecedente registrado.</p>}
             {ahfItems.map((item) => (
-              <div key={item.nombre} className="flex items-center gap-2">
-                <Label className={`w-2/5 text-xs font-semibold text-zinc-700 print:text-[10px]`}>{item.nombre}</Label>
-                <Input disabled={isGuardado} placeholder="Parentesco..." value={item.valor} onChange={e => updateAhf(item.nombre, e.target.value)} className={`flex-1 h-8 text-xs ${printInputStyle}`} />
-                {!isGuardado && <Button type="button" onClick={() => removerAhf(item.nombre)} variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600 print:hidden shrink-0"><X className="h-4 w-4"/></Button>}
+              <div key={item.nombre} className="flex gap-2 items-center">
+                <Label className="w-2/5 text-xs font-bold">{item.nombre}</Label>
+                <Input disabled={isGuardado} value={item.valor} onChange={e => updateAhf(item.nombre, e.target.value)} className={`flex-1 h-8 text-xs ${printInputStyle}`} />
+                {!isGuardado && <Button type="button" onClick={() => setAhfItems(ahfItems.filter(x => x.nombre !== item.nombre))} variant="ghost" size="icon" className="h-8 w-8 text-red-400 print:hidden"><X className="h-4 w-4"/></Button>}
               </div>
             ))}
           </div>
         </div>
 
         <div className={printSectionStyle.replace("mt-4","")}>
-          <h2 className={sectionTitleStyle}>3. Personales Patológicos</h2>
+          <h2 className="text-lg font-bold text-umi-blue border-b pb-2 mb-4 print:text-sm">3. Antecedentes Personales</h2>
           {!isGuardado && (
             <div className="flex gap-2 mb-4 print:hidden">
-              <select value={appSelect} onChange={e => setAppSelect(e.target.value)} className="flex-1 rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm">
-                <option value="">Añadir antecedente...</option>
-                {APP_LIST.filter(item => !appItems.some(x => x.nombre === item)).map(item => <option key={item} value={item}>{item}</option>)}
-              </select>
-              <Button type="button" onClick={agregarApp} variant="outline" size="icon" className="shrink-0"><Plus className="h-4 w-4 text-umi-blue" /></Button>
+              <select value={appSelect} onChange={e => setAppSelect(e.target.value)} className="flex-1 rounded-md border border-zinc-200 px-3 py-1 text-sm"><option value="">Añadir...</option>{APP_LIST.filter(i => !appItems.some(x => x.nombre === i)).map(i => <option key={i} value={i}>{i}</option>)}</select>
+              <Button type="button" onClick={agregarApp} variant="outline" size="icon"><Plus className="h-4 w-4"/></Button>
             </div>
           )}
           <div className="space-y-2">
-            {appItems.length === 0 && <p className="text-xs text-zinc-400 italic">Ningún antecedente registrado.</p>}
             {appItems.map((item) => (
-              <div key={item.nombre} className="flex items-center gap-2">
-                <Label className={`w-2/5 text-xs font-semibold text-zinc-700 print:text-[10px]`}>{item.nombre}</Label>
-                <Input disabled={isGuardado} placeholder="Detalles..." value={item.valor} onChange={e => updateApp(item.nombre, e.target.value)} className={`flex-1 h-8 text-xs ${printInputStyle}`} />
-                {!isGuardado && <Button type="button" onClick={() => removerApp(item.nombre)} variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600 print:hidden shrink-0"><X className="h-4 w-4"/></Button>}
+              <div key={item.nombre} className="flex gap-2 items-center">
+                <Label className="w-2/5 text-xs font-bold">{item.nombre}</Label>
+                <Input disabled={isGuardado} value={item.valor} onChange={e => updateApp(item.nombre, e.target.value)} className={`flex-1 h-8 text-xs ${printInputStyle}`} />
+                {!isGuardado && <Button type="button" onClick={() => setAppItems(appItems.filter(x => x.nombre !== item.nombre))} variant="ghost" size="icon" className="h-8 w-8 text-red-400 print:hidden"><X className="h-4 w-4"/></Button>}
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* SECCIÓN 4: APNP */}
+      {/* 4. APNP */}
       <div className={printSectionStyle}>
-        <h2 className={sectionTitleStyle}>4. Personales No Patológicos</h2>
+        <h2 className="text-lg font-bold text-umi-blue border-b pb-2 mb-4 print:text-sm">4. Estilo de Vida y APNP</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3 print:gap-2">
-          <div className="space-y-1"><Label className={printLabelStyle}>¿Fumas? (Cant/Día)</Label><Input disabled={isGuardado} placeholder="Ej. Sí, 5 al día" className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>¿Tomas alcohol? (Frecuencia)</Label><Input disabled={isGuardado} placeholder="Ej. Fines de semana" className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Otras sustancias (Frecuencia)</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Horas de sueño constante</Label><Input disabled={isGuardado} type="number" placeholder="Horas" className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>¿Ejercicio/Deporte? (Cuál y Frec)</Label><Input disabled={isGuardado} placeholder="Ej. Gym 3x semana" className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Vacunas recientes</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1 md:col-span-2 print:col-span-2"><Label className={printLabelStyle}>Comidas al día y listado cotidiano</Label><Input disabled={isGuardado} placeholder="Ej. 3 veces. Huevos, pollo..." className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Medicamentos / Suplementos</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="space-y-1 md:col-span-3 print:col-span-3"><Label className={printLabelStyle}>Vivienda y Servicios (Luz, agua, gas, internet)</Label><Input disabled={isGuardado} placeholder="Cuenta con todos los servicios..." className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Fumas/Alcohol/Sustancias</Label><Input name="habitos_toxicos" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Sueño y Deporte</Label><Input name="sueno_deporte" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Comidas al día</Label><Input name="dieta" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1 md:col-span-3 print:col-span-3"><Label className={printLabelStyle}>Vivienda y Servicios Generales</Label><Input name="vivienda" disabled={isGuardado} className={printInputStyle} /></div>
         </div>
       </div>
 
-      {/* SECCIÓN 5: PADECIMIENTO E INTERROGATORIO */}
+      {/* 5. INTERROGATORIO */}
       <div className={printSectionStyle}>
-        <h2 className={sectionTitleStyle}>5. Padecimiento Actual e Interrogatorio por Sistemas</h2>
+        <h2 className="text-lg font-bold text-umi-blue border-b pb-2 mb-4 print:text-sm">5. Padecimiento Actual e Interrogatorio</h2>
         <div className="space-y-4 print:space-y-2">
-          <div className="space-y-1">
-            <Label className={`font-semibold text-umi-blue ${printLabelStyle}`}>Padecimiento Actual</Label>
-            <Textarea disabled={isGuardado} rows={3} className={`${printInputStyle} print:resize-none`} />
-          </div>
+          <div className="space-y-1"><Label className={`font-bold text-umi-blue ${printLabelStyle}`}>Padecimiento Actual</Label><Textarea name="padecimiento_actual" disabled={isGuardado} rows={2} className={printInputStyle} /></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2 print:gap-2">
-            <div className="space-y-1"><Label className={printLabelStyle}>Gastrointestinal (dolor, reflujo, colitis...)</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-            <div className="space-y-1"><Label className={printLabelStyle}>Respiratorios (vías superiores, inferiores...)</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-            <div className="space-y-1"><Label className={printLabelStyle}>Nefrourinarios (dolor, color, dificultad...)</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-            <div className="space-y-1"><Label className={printLabelStyle}>Circulatorios (pesadez, hinchazón, úlceras...)</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-            <div className="space-y-1"><Label className={printLabelStyle}>Neurológico (sensibilidad, fuerza...)</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-            <div className="space-y-1"><Label className={printLabelStyle}>Muscular (dolor, debilidad...)</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-            <div className="space-y-1 md:col-span-2 print:col-span-2"><Label className={printLabelStyle}>Ósteoarticular (sonido, restricción...)</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
+            <div className="space-y-1"><Label className={printLabelStyle}>Gastrointestinal / Respiratorio</Label><Input name="sist_gastro_resp" disabled={isGuardado} className={printInputStyle} /></div>
+            <div className="space-y-1"><Label className={printLabelStyle}>Neurológico / Circulatorio</Label><Input name="sist_neuro_circ" disabled={isGuardado} className={printInputStyle} /></div>
+            <div className="space-y-1 md:col-span-2 print:col-span-2"><Label className={printLabelStyle}>Ósteoarticular / Muscular</Label><Input name="sist_osteo_muscular" disabled={isGuardado} className={printInputStyle} /></div>
           </div>
         </div>
       </div>
 
-      {/* SECCIÓN 6: EXPLORACIÓN FÍSICA Y ESCALAS INTERACTIVAS */}
+      {/* 6. EXPLORACIÓN Y ESCALAS */}
       <div className={printSectionStyle}>
-        <h2 className={sectionTitleStyle}>6. Exploración Física y Pruebas</h2>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 print:grid-cols-4 print:gap-2 print:mb-2">
-          <div className="space-y-1"><Label className={printLabelStyle}>Tensión Arterial</Label><Input disabled={isGuardado} placeholder="120/80" className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Frec. Cardiaca</Label><Input disabled={isGuardado} placeholder="lpm" className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Frec. Respiratoria</Label><Input disabled={isGuardado} placeholder="rpm" className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Temp / SpO2</Label><Input disabled={isGuardado} placeholder="°C / %" className={printInputStyle} /></div>
+        <h2 className="text-lg font-bold text-umi-blue border-b pb-2 mb-4 print:text-sm">6. Exploración Física y Escalas</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 print:grid-cols-4 print:gap-2">
+          <div className="space-y-1"><Label className={printLabelStyle}>TA</Label><Input name="signos_ta" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>FC</Label><Input name="signos_fc" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>FR</Label><Input name="signos_fr" disabled={isGuardado} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Temp/SpO2</Label><Input name="signos_temp" disabled={isGuardado} className={printInputStyle} /></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 print:grid-cols-2">
+          <div className="space-y-1"><Label className={printLabelStyle}>Examen Muscular y Goniometría</Label><Textarea name="examen_fisico" disabled={isGuardado} rows={2} className={printInputStyle} /></div>
+          <div className="space-y-1"><Label className={printLabelStyle}>Resultados de Estudios Previos</Label><Textarea name="estudios_previos" disabled={isGuardado} rows={2} className={printInputStyle} /></div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 print:grid-cols-3 print:gap-2 print:mb-2">
-          <div className="space-y-1"><Label className={printLabelStyle}>Examen Manual Muscular</Label><Textarea disabled={isGuardado} rows={2} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Goniometría</Label><Textarea disabled={isGuardado} rows={2} className={printInputStyle} /></div>
-          <div className="space-y-1"><Label className={printLabelStyle}>Antropometría</Label><Textarea disabled={isGuardado} rows={2} className={printInputStyle} /></div>
-        </div>
-
-        {/* ESCALAS DINÁMICAS E INTERACTIVAS */}
-        <Label className={`font-semibold text-umi-teal block mb-2 ${printLabelStyle}`}>Escalas Aplicadas</Label>
-        
+        <Label className={`font-bold text-umi-teal block mb-2 ${printLabelStyle}`}>Escalas Aplicadas</Label>
         {!isGuardado && (
           <div className="flex gap-2 mb-4 max-w-md print:hidden">
-            <select value={escalaSelect} onChange={e => setEscalaSelect(e.target.value)} className="flex-1 rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm">
-              <option value="">Añadir escala interactiva...</option>
-              {ESCALAS_LIST.filter(item => !escalaItems.some(x => x.nombre === item)).map(item => <option key={item} value={item}>{item}</option>)}
-            </select>
-            <Button type="button" onClick={agregarEscala} variant="outline" size="icon" className="shrink-0"><Plus className="h-4 w-4 text-umi-blue" /></Button>
+            <select value={escalaSelect} onChange={e => setEscalaSelect(e.target.value)} className="flex-1 rounded-md border border-zinc-200 px-3 py-1 text-sm"><option value="">Añadir escala...</option>{ESCALAS_LIST.filter(i => !escalaItems.some(x => x.nombre === i)).map(i => <option key={i} value={i}>{i}</option>)}</select>
+            <Button type="button" onClick={agregarEscala} variant="outline" size="icon"><Plus className="h-4 w-4"/></Button>
           </div>
         )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 print:grid-cols-2 print:gap-x-4 print:gap-y-2">
-          {escalaItems.length === 0 && <p className="text-xs text-zinc-400 italic col-span-2">Ninguna escala registrada.</p>}
-          
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 print:grid-cols-2 print:gap-x-4">
           {escalaItems.map((item) => (
              <div key={item.nombre} className="flex items-center gap-3">
-               <Label className="w-1/3 text-xs font-bold text-zinc-700 print:text-[10px] truncate">{item.nombre}</Label>
-               
+               <Label className="w-1/3 text-xs font-bold truncate">{item.nombre}</Label>
                {item.nombre === "EVA" ? (
-                  <>
-                    <div className="flex-1 flex items-center gap-3 print:hidden">
-                      <input 
-                        type="range" min="0" max="10" disabled={isGuardado}
-                        value={item.valor || "0"} onChange={e => updateEscala(item.nombre, e.target.value)} 
-                        className="w-full accent-orange-500" 
-                      />
-                      <span className={`font-bold w-6 text-center ${parseInt(item.valor) > 6 ? 'text-red-500' : parseInt(item.valor) > 3 ? 'text-orange-500' : 'text-green-500'}`}>{item.valor || "0"}</span>
-                    </div>
-                    <div className="hidden print:block flex-1 text-[10px] border-b border-zinc-300">{item.valor || "0"} / 10</div>
-                  </>
-               ) : item.nombre === "Daniels" ? (
-                  <>
-                    <select disabled={isGuardado} value={item.valor} onChange={e => updateEscala(item.nombre, e.target.value)} className={`flex-1 h-8 text-[11px] rounded-md border border-zinc-200 px-2 print:hidden`}>
-                      <option value="">Seleccionar grado...</option>
-                      <option value="0 - Ausencia de contracción">0 - Ausencia de contracción</option>
-                      <option value="1 - Contracción visible/palpable">1 - Contracción visible/palpable</option>
-                      <option value="2 - Mov. sin gravedad">2 - Movimiento sin gravedad</option>
-                      <option value="3 - Mov. contra gravedad">3 - Movimiento contra gravedad</option>
-                      <option value="4 - Resistencia moderada">4 - Resistencia moderada</option>
-                      <option value="5 - Resistencia máxima (Normal)">5 - Resistencia máxima (Normal)</option>
-                    </select>
-                    <div className="hidden print:block flex-1 text-[10px] border-b border-zinc-300">{item.valor || "No evaluado"}</div>
-                  </>
+                  <div className="flex-1 flex items-center gap-3"><input type="range" min="0" max="10" disabled={isGuardado} value={item.valor} onChange={e => updateEscala(item.nombre, e.target.value)} className="w-full print:hidden" /><span className="font-bold print:text-[10px]">{item.valor}/10</span></div>
                ) : (
-                  <div className="flex-1 flex items-center gap-2">
-                    <Input disabled={isGuardado} placeholder="Puntaje/resultado" value={item.valor} onChange={e => updateEscala(item.nombre, e.target.value)} className={`flex-1 h-8 text-xs ${printInputStyle}`} />
-                    <span className="text-[10px] text-zinc-400 shrink-0">{ESCALAS_HINTS[item.nombre] || ""}</span>
-                  </div>
+                  <Input disabled={isGuardado} value={item.valor} onChange={e => updateEscala(item.nombre, e.target.value)} className={`flex-1 h-8 text-xs ${printInputStyle}`} />
                )}
-
-               {!isGuardado && <Button type="button" onClick={() => removerEscala(item.nombre)} variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600 print:hidden shrink-0"><X className="h-4 w-4"/></Button>}
+               {!isGuardado && <Button type="button" onClick={() => setEscalaItems(escalaItems.filter(x => x.nombre !== item.nombre))} variant="ghost" size="icon" className="text-red-400 print:hidden"><X className="h-4 w-4"/></Button>}
              </div>
           ))}
         </div>
       </div>
 
-      {/* SECCIÓN 7: Dx y Tx */}
+      {/* 7. Dx y Tx */}
       <div className={printSectionStyle}>
-        <h2 className={sectionTitleStyle}>7. Diagnóstico y Tratamiento</h2>
+        <h2 className="text-lg font-bold text-umi-blue border-b pb-2 mb-4 print:text-sm">7. Diagnóstico y Plan</h2>
         <div className="space-y-4 print:space-y-2">
-          <div className="space-y-1"><Label className={printLabelStyle}>Resultados previos o actuales de estudios</Label><Input disabled={isGuardado} className={printInputStyle} /></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2 print:gap-2">
-            <div className="space-y-1"><Label className={printLabelStyle}>Terapéutica: Medicamento (Vía, Dosis, Frec)</Label><Textarea disabled={isGuardado} rows={2} className={printInputStyle} /></div>
-            <div className="space-y-1"><Label className={printLabelStyle}>Terapéutica: Fisioterapia (Técnica, Dosis, Frec)</Label><Textarea disabled={isGuardado} rows={2} className={printInputStyle} /></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3">
+            <div className="space-y-1"><Label className={printLabelStyle}>Dx: Estructura y Función</Label><Textarea name="dx_estructura" disabled={isGuardado} rows={2} className={printInputStyle} /></div>
+            <div className="space-y-1"><Label className={printLabelStyle}>Dx: Actividad</Label><Textarea name="dx_actividad" disabled={isGuardado} rows={2} className={printInputStyle} /></div>
+            <div className="space-y-1"><Label className={printLabelStyle}>Dx: Participación</Label><Textarea name="dx_participacion" disabled={isGuardado} rows={2} className={printInputStyle} /></div>
           </div>
-          <Label className={`font-semibold text-umi-blue block pt-2 ${printLabelStyle}`}>Diagnóstico Funcional / Problemas Clínicos</Label>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3 print:gap-2">
-            <div className="space-y-1"><Label className={printLabelStyle}>Estructura corporal y función vs déficit</Label><Textarea disabled={isGuardado} rows={2} className={printInputStyle} /></div>
-            <div className="space-y-1"><Label className={printLabelStyle}>Actividad vs limitación en actividad</Label><Textarea disabled={isGuardado} rows={2} className={printInputStyle} /></div>
-            <div className="space-y-1"><Label className={printLabelStyle}>Participación vs restricción en participación</Label><Textarea disabled={isGuardado} rows={2} className={printInputStyle} /></div>
-          </div>
-          <div className="space-y-1"><Label className={`font-semibold text-umi-teal ${printLabelStyle}`}>Pronóstico y Plan de Tratamiento</Label><Textarea disabled={isGuardado} rows={3} className={`${printInputStyle} print:resize-none`} /></div>
+          <div className="space-y-1"><Label className={`font-bold text-umi-teal ${printLabelStyle}`}>Plan de Tratamiento y Pronóstico</Label><Textarea name="plan_tratamiento" disabled={isGuardado} rows={2} className={printInputStyle} /></div>
         </div>
       </div>
 
-      {/* SECCIÓN FIRMAS */}
+      {/* FIRMAS */}
       <div className={printSectionStyle}>
-        <h2 className={sectionTitleStyle}>Firmas y Autorizaciones</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 print:gap-4 print:mt-2">
+        <h2 className="text-lg font-bold text-umi-blue border-b pb-2 mb-4 print:text-sm">Firmas y Autorizaciones</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 print:gap-4">
           <div className="flex flex-col items-center space-y-2">
-            <Label className="font-bold text-zinc-700 print:text-[10px]">Firma del Paciente / Tutor</Label>
-            <div className={`border-2 border-dashed border-zinc-300 rounded-lg bg-zinc-50 overflow-hidden w-full max-w-[300px] print:border-solid print:border-b-2 print:border-t-0 print:border-x-0 print:bg-transparent print:rounded-none ${isGuardado ? 'pointer-events-none' : ''}`}>
-              <SignatureCanvas ref={sigPadPaciente} penColor="#0f172a" canvasProps={{className: 'w-full h-20 cursor-crosshair'}} />
-            </div>
-            {!isGuardado && (
-              <div className="flex justify-between w-full max-w-[300px] items-center print:hidden">
-                <span className="text-[10px] text-zinc-400">Trace su firma</span>
-                <Button type="button" variant="ghost" size="sm" onClick={limpiarFirmaPaciente} className="text-red-500 h-6 text-xs p-0"><Eraser className="h-3 w-3 mr-1" /> Limpiar</Button>
-              </div>
-            )}
-            <div className="w-full max-w-[300px] text-center mt-2 hidden print:block"><div className="text-[9px] uppercase font-medium">{paciente.nombre_completo || "Nombre del Paciente"}</div></div>
+            <Label className="font-bold print:text-[10px]">Firma del Paciente / Tutor</Label>
+            <div className={`border-2 border-dashed border-zinc-300 rounded-lg w-full max-w-[300px] print:border-solid print:border-b-2 print:border-t-0 print:border-x-0 print:rounded-none ${isGuardado ? 'pointer-events-none' : ''}`}><SignatureCanvas ref={sigPadPaciente} penColor="#0f172a" canvasProps={{className: 'w-full h-20'}} /></div>
+            {!isGuardado && <Button type="button" variant="ghost" size="sm" onClick={limpiarFirmaPaciente} className="text-red-500 h-6 text-xs p-0 print:hidden"><Eraser className="h-3 w-3 mr-1" /> Limpiar</Button>}
           </div>
           <div className="flex flex-col items-center space-y-2">
             <Label className="font-bold text-umi-blue print:text-[10px]">Fisioterapeuta Titular</Label>
             {fisioFirmado ? (
-              <div className="w-full max-w-[300px] h-20 border-2 border-umi-blue bg-indigo-50/50 rounded-lg flex flex-col items-center justify-center p-2 relative print:border-none print:bg-transparent print:h-auto">
-                <CheckCircle2 className="h-5 w-5 text-green-500 mb-1 print:hidden" />
+              <div className="w-full max-w-[300px] border-2 border-umi-blue bg-indigo-50/50 rounded-lg flex flex-col items-center justify-center p-2 print:border-none print:bg-transparent">
+                <CheckCircle2 className="h-5 w-5 text-green-500 print:hidden" />
                 <span className="font-bold text-umi-blue text-sm print:text-xs">{fisioActual.nombre}</span>
-                <span className="text-xs text-zinc-600 print:text-[10px]">Cédula Prof: {fisioActual.cedula}</span>
-                <span className="text-[9px] text-zinc-400 mt-1">Validado criptográficamente por PIN</span>
+                <span className="text-xs text-zinc-600 print:text-[10px]">Cédula: {fisioActual.cedula}</span>
               </div>
             ) : (
-              <div className="w-full max-w-[300px] h-20 border-2 border-dashed border-zinc-300 bg-zinc-50 rounded-lg flex flex-col items-center justify-center p-2 print:hidden">
+              <div className="w-full max-w-[300px] border-2 border-dashed border-zinc-300 bg-zinc-50 rounded-lg flex flex-col items-center p-2 print:hidden">
                 <div className="flex gap-2">
-                  <Input type="password" maxLength={4} placeholder="PIN" className={`w-20 text-center tracking-widest h-8 ${errorPin ? "border-red-500 bg-red-50" : ""}`} value={pin} onChange={(e) => setPin(e.target.value)}/>
+                  <Input type="password" maxLength={4} placeholder="PIN" className={`w-20 text-center tracking-widest h-8 ${errorPin ? "border-red-500" : ""}`} value={pin} onChange={(e) => setPin(e.target.value)}/>
                   <Button type="button" size="sm" onClick={handleFirmaFisio} className="bg-umi-blue text-white h-8">Firmar</Button>
                 </div>
-                {errorPin && <span className="text-[10px] text-red-500 mt-1">PIN incorrecto</span>}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* ACCIONES POST-GUARDADO */}
-      <div className="print:hidden mt-8 border-t border-zinc-200 pt-6">
+      {/* ACCIONES */}
+      <div className="print:hidden mt-8 border-t pt-6">
         {isGuardado ? (
           <div className="flex justify-between items-center bg-green-50 p-4 rounded-xl border border-green-200">
-            <div className="flex items-center gap-3 text-green-800">
-              <CheckCircle2 className="h-6 w-6" />
-              <div><p className="font-bold">Expediente Guardado</p><p className="text-xs opacity-80">NOM-004 garantizado.</p></div>
-            </div>
-            <Button type="button" onClick={handlePrint} className="bg-white text-green-800 border border-green-300 hover:bg-green-100">
-              <Printer className="mr-2 h-4 w-4" /> Exportar PDF Membretado
-            </Button>
+            <div className="flex items-center gap-3 text-green-800"><CheckCircle2 className="h-6 w-6" /><div><p className="font-bold">Guardado en Base de Datos</p></div></div>
+            <Button type="button" onClick={handlePrint} className="bg-white text-green-800 border-green-300"><Printer className="mr-2 h-4 w-4" /> Exportar PDF</Button>
           </div>
         ) : (
           <div className="flex justify-end sticky bottom-6 z-10">
-            <Button type="submit" className="bg-umi-blue hover:bg-indigo-900 text-white shadow-xl px-8 py-6 text-lg rounded-full">
-              <Save className="mr-2 h-5 w-5" /> Cerrar y Guardar Historia Clínica
+            <Button type="submit" disabled={isGuardando} className="bg-umi-blue hover:bg-indigo-900 text-white shadow-xl px-8 py-6 text-lg rounded-full">
+              {isGuardando ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />} Cerrar y Guardar
             </Button>
           </div>
         )}

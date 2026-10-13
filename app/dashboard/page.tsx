@@ -1,175 +1,169 @@
-import { 
-  Plus, Download, Search, Users, Activity, 
-  CheckCircle, TrendingUp, Filter
-} from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { Plus, Download, Users, Activity, CheckCircle2, Search, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createClient } from "@/lib/supabase/server";
-import { NuevoPaciente } from "@/components/clinica/NuevoPaciente";
-import Link from "next/link";
 
 export default async function DashboardPage() {
-  // 1. Inicializar Supabase y consultar los datos reales
   const supabase = await createClient();
-  const { data: pacientesDb, error } = await supabase
+
+  // Obtener los pacientes REALES de Supabase
+  const { data: pacientesDb } = await supabase
     .from("pacientes")
     .select("*")
-    .order("fecha_registro", { ascending: false });
+    .order("id", { ascending: false });
 
-  // 2. Calcular métricas reales basadas en la base de datos
+  // Calcular estadísticas para las tarjetas
   const totalExpedientes = pacientesDb?.length || 0;
-  const enTratamiento = pacientesDb?.filter(p => p.estatus_clinico === "En tratamiento").length || 0;
-  const altas = pacientesDb?.filter(p => p.estatus_clinico === "Alta médica").length || 0;
+  const enTratamiento = pacientesDb?.filter(p => !p.estatus_clinico || p.estatus_clinico === 'En valoración' || p.estatus_clinico === 'Activo').length || 0;
+  const altasMedicas = pacientesDb?.filter(p => p.estatus_clinico === 'Alta').length || 0;
 
-  // 3. Función auxiliar para asignar colores según el estatus
+  // Función para dar color al estatus
   const getColorEstatus = (estatus: string) => {
-    if (estatus === "En tratamiento") return "text-blue-600 bg-blue-50 border-blue-200";
-    if (estatus === "Alta médica") return "text-umi-teal bg-teal-50 border-teal-200";
-    return "text-orange-600 bg-orange-50 border-orange-200"; // En valoración
+    if (!estatus || estatus === "En valoración" || estatus === "Activo") {
+      return "text-orange-600 bg-orange-50 border-orange-200";
+    }
+    if (estatus === "Alta") {
+      return "text-teal-700 bg-teal-50 border-teal-200";
+    }
+    return "text-zinc-600 bg-zinc-100 border-zinc-200";
   };
-
-  // 4. Formatear fechas
-  const formatFecha = (isoString: string) => {
-    if (!isoString) return "Sin registro";
-    const date = new Date(isoString);
-    return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
-  };
-
-  if (error) {
-    return <div className="p-8 text-red-500">Error cargando expedientes: {error.message}</div>;
-  }
 
   return (
-    <div className="flex flex-col gap-6 p-8">
-      {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="flex flex-col gap-6 p-8 min-h-screen">
+      
+      {/* Encabezado Principal */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-umi-blue">Expedientes de Pacientes</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Directorio general y control centralizado del historial clínico, evolución funcional y bitácora.
-          </p>
+          <h1 className="text-3xl font-bold text-umi-blue">Expedientes de Pacientes</h1>
+          <p className="text-sm text-zinc-500 mt-1">Directorio general y control centralizado del historial clínico, evolución funcional y bitácora.</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" className="text-zinc-600">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="text-zinc-600 bg-white shadow-sm">
             <Download className="mr-2 h-4 w-4" /> Exportar Reporte
           </Button>
-          <NuevoPaciente />
+          {/* ENLACE DIRECTO A NUEVA HISTORIA CLÍNICA */}
+          <Link href="/dashboard/nueva-historia">
+            <Button className="bg-umi-blue hover:bg-indigo-900 text-white rounded-full px-6 shadow-md">
+              <Plus className="mr-2 h-4 w-4" /> Nuevo Expediente
+            </Button>
+          </Link>
         </div>
       </div>
 
-      {/* Tarjetas de Métricas Dinámicas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm">
-          <div className="flex justify-between items-center text-zinc-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Expedientes</span>
-            <Users className="h-4 w-4 text-umi-blue" />
+      {/* Tarjetas de Resumen */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <p className="text-xs font-bold text-zinc-500 tracking-wider">TOTAL EXPEDIENTES</p>
+            <Users className="h-4 w-4 text-zinc-400" />
           </div>
-          <div className="text-3xl font-bold text-zinc-900">{totalExpedientes}</div>
-          <div className="text-xs text-zinc-500 mt-2 flex items-center gap-1">
-            <span className="text-green-600 font-medium flex items-center"><TrendingUp className="h-3 w-3 mr-1"/> Sincronizado</span>
+          <div className="mt-2">
+            <h2 className="text-4xl font-black text-zinc-800">{totalExpedientes}</h2>
+            <p className="text-xs text-green-600 flex items-center gap-1 mt-1 font-medium">
+              <Activity className="h-3 w-3" /> Sincronizado
+            </p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm">
-          <div className="flex justify-between items-center text-zinc-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">En Tratamiento</span>
+        <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <p className="text-xs font-bold text-zinc-500 tracking-wider">EN TRATAMIENTO</p>
             <Activity className="h-4 w-4 text-orange-500" />
           </div>
-          <div className="text-3xl font-bold text-orange-600">{enTratamiento}</div>
-          <div className="text-xs text-zinc-500 mt-2">
-            Pacientes activos en clínica
+          <div className="mt-2">
+            <h2 className="text-4xl font-black text-orange-500">{enTratamiento}</h2>
+            <p className="text-xs text-zinc-500 mt-1">Pacientes activos en clínica</p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm">
-          <div className="flex justify-between items-center text-zinc-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Altas Médicas</span>
-            <CheckCircle className="h-4 w-4 text-umi-teal" />
+        <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <p className="text-xs font-bold text-zinc-500 tracking-wider">ALTAS MÉDICAS</p>
+            <CheckCircle2 className="h-4 w-4 text-teal-500" />
           </div>
-          <div className="text-3xl font-bold text-umi-teal">{altas}</div>
-          <div className="text-xs text-zinc-500 mt-2">
-            Resolución exitosa
+          <div className="mt-2">
+            <h2 className="text-4xl font-black text-teal-500">{altasMedicas}</h2>
+            <p className="text-xs text-zinc-500 mt-1">Resolución exitosa</p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm">
-          <div className="flex justify-between items-center text-zinc-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Nuevos Ingresos</span>
-            <Plus className="h-4 w-4 text-umi-blue" />
+        <div className="bg-white p-5 rounded-2xl border border-zinc-200 shadow-sm flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <p className="text-xs font-bold text-zinc-500 tracking-wider">NUEVOS INGRESOS</p>
+            <Plus className="h-4 w-4 text-zinc-400" />
           </div>
-          <div className="text-3xl font-bold text-zinc-900">0</div>
-          <div className="text-xs text-zinc-500 mt-2">
-            Esta semana
+          <div className="mt-2">
+            <h2 className="text-4xl font-black text-zinc-800">0</h2>
+            <p className="text-xs text-zinc-500 mt-1">Esta semana</p>
           </div>
         </div>
       </div>
 
-      {/* Contenedor Principal: Buscador y Tabla */}
-      <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden flex flex-col">
-        {/* ... Barra de búsqueda se mantiene igual ... */}
-        <div className="p-4 border-b border-zinc-200 flex flex-col md:flex-row gap-4 justify-between items-center bg-zinc-50/50">
-          <div className="relative w-full md:max-w-md">
+      {/* Tabla y Buscador */}
+      <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div className="p-4 border-b border-zinc-200 flex items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-            <Input placeholder="Buscar por nombre completo, RFC, CURP o folio..." className="pl-9 bg-white border-zinc-300"/>
+            <Input placeholder="Buscar por nombre, RFC o folio..." className="pl-9 bg-zinc-50 border-zinc-200 h-10 rounded-lg" />
           </div>
-          <div className="flex gap-2 w-full md:w-auto">
-            <Button variant="outline" size="sm" className="bg-white text-zinc-600"><Filter className="mr-2 h-4 w-4" /> Filtros</Button>
-          </div>
+          <Button variant="outline" className="text-zinc-600 bg-white">
+            <Filter className="mr-2 h-4 w-4" /> Filtros
+          </Button>
         </div>
 
-        {/* Tabla de Datos Mapeada desde BD */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-zinc-500 uppercase bg-zinc-50 border-b border-zinc-200">
+            <thead className="bg-white text-zinc-500 font-bold text-[10px] uppercase tracking-wider border-b border-zinc-200">
               <tr>
-                <th className="px-6 py-4 font-semibold">Folio Paciente</th>
-                <th className="px-6 py-4 font-semibold">Paciente & Demográficos</th>
-                <th className="px-6 py-4 font-semibold">Contacto & Canal</th>
-                <th className="px-6 py-4 font-semibold">Diagnóstico / Especialidad</th>
-                <th className="px-6 py-4 font-semibold">Estatus Clínico</th>
-                <th className="px-6 py-4 font-semibold">Última Cita</th>
+                <th className="px-6 py-4">Folio Paciente</th>
+                <th className="px-6 py-4">Paciente & Demográficos</th>
+                <th className="px-6 py-4">Contacto & Canal</th>
+                <th className="px-6 py-4">Diagnóstico / Especialidad</th>
+                <th className="px-6 py-4">Estatus Clínico</th>
+                <th className="px-6 py-4">Última Cita</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200">
-  {pacientesDb?.map((paciente) => (
-    <tr key={paciente.id} className="hover:bg-zinc-50/80 transition-colors">
-      <td className="px-6 py-4">
-        {/* Enlace en el Folio */}
-        <Link href={`/dashboard/pacientes/${paciente.id}`}>
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-800 border border-zinc-200 hover:bg-umi-blue hover:text-white transition-colors cursor-pointer">
-            {paciente.folio}
-          </span>
-        </Link>
-      </td>
-      <td className="px-6 py-4">
-        {/* Enlace en el Nombre */}
-        <Link href={`/dashboard/pacientes/${paciente.id}`}>
-          <div className="font-medium text-umi-blue hover:underline cursor-pointer">
-            {paciente.nombre_completo}
-          </div>
-        </Link>
-        <div className="text-xs text-zinc-500 mt-1">{paciente.edad} años • {paciente.genero} • RFC: {paciente.rfc}</div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="text-zinc-700">{paciente.telefono}</div>
-        <div className="text-xs text-zinc-500 mt-1">{paciente.email}</div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="text-zinc-900">{paciente.diagnostico_clinico}</div>
-        <div className="text-xs text-zinc-500 mt-1">{paciente.especialidad}</div>
-      </td>
-      <td className="px-6 py-4">
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${getColorEstatus(paciente.estatus_clinico)}`}>
-          <span className="w-1.5 h-1.5 rounded-full bg-current mr-2"></span>
-          {paciente.estatus_clinico}
-        </span>
-      </td>
-      <td className="px-6 py-4 font-medium text-zinc-700">
-        {formatFecha(paciente.ultima_cita)}
-      </td>
-    </tr>
-  ))}
-</tbody>
+            <tbody className="divide-y divide-zinc-100">
+              {pacientesDb && pacientesDb.length > 0 ? (
+                pacientesDb.map((paciente) => (
+                  <tr key={paciente.id} className="hover:bg-zinc-50/80 transition-colors">
+                    <td className="px-6 py-4">
+                      <Link href={`/dashboard/pacientes/${paciente.id}`}>
+                        <div className="inline-flex items-center px-3 py-1.5 bg-zinc-50 rounded-lg border border-zinc-200 hover:border-umi-blue hover:bg-blue-50 transition-colors cursor-pointer text-xs font-bold text-zinc-700">
+                          {paciente.folio}
+                        </div>
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Link href={`/dashboard/pacientes/${paciente.id}`}>
+                        <div className="font-medium text-umi-blue hover:underline cursor-pointer text-sm">
+                          {paciente.nombre_completo}
+                        </div>
+                      </Link>
+                      <div className="text-[11px] text-zinc-500 mt-1">
+                        {paciente.edad || 0} años • {paciente.genero || 'N/A'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-zinc-600">{paciente.telefono || "Sin registro"}</td>
+                    <td className="px-6 py-4 text-xs text-zinc-600">Fisioterapia y Rehabilitación</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border ${getColorEstatus(paciente.estatus_clinico)}`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></span>
+                        {paciente.estatus_clinico || "En valoración"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-zinc-500">Sin registro</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">
+                    No hay pacientes registrados en la base de datos.
+                  </td>
+                </tr>
+              )}
+            </tbody>
           </table>
         </div>
       </div>
