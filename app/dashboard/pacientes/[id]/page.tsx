@@ -4,6 +4,7 @@ import { User, FileText, Activity, FolderOpen, AlertTriangle } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { HistoriaClinicaForm } from "@/components/clinica/HistoriaClinicaForm";
 import { EvolucionTimeline } from "@/components/clinica/EvolucionTimeline";
+import { GestorArchivos } from "@/components/clinica/GestorArchivos";
 
 type Props = {
   params: Promise<{ id: string }>
@@ -13,35 +14,42 @@ export default async function ExpedientePacientePage({ params }: Props) {
   const { id } = await params;
   const supabase = await createClient();
 
+  // 1. Extraemos el paciente específico de la base de datos
   const { data: paciente, error } = await supabase
     .from("pacientes")
     .select("*")
     .eq("id", id)
     .single();
 
-  // PANEL DE DIAGNÓSTICO (Reemplaza al 404)
+  // 2. Extraemos el fisio que inició sesión
+  const { data: { user } } = await supabase.auth.getUser();
+  let fisioActual = null;
+  
+  if (user) {
+    const { data: staffData } = await supabase
+      .from("perfiles_staff")
+      .select("*")
+      .eq("email", user.email)
+      .single();
+      
+    fisioActual = staffData;
+  }
+
+  // Si no se encuentra el paciente, mostramos un error
   if (error || !paciente) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4 p-8">
         <AlertTriangle className="h-16 w-16 text-red-500" />
-        <h1 className="text-2xl font-bold text-zinc-900">Lectura Bloqueada por Supabase</h1>
-        <div className="bg-white p-6 rounded-lg border border-red-200 shadow-sm text-center max-w-lg">
-          <p className="text-sm text-red-600 font-bold mb-2">Mensaje devuelto por la Base de Datos:</p>
-          <code className="text-xs bg-zinc-100 p-3 rounded block mb-2 font-mono text-zinc-800 text-left overflow-x-auto">
-            {error?.message || "Row not found (Paciente no encontrado en la base de datos)"}
-          </code>
-          <p className="text-xs text-zinc-500 mt-4 text-left">
-            Si el error dice "Row not found", la Seguridad RLS de Supabase sigue activa bloqueando la lectura, o no se insertaron correctamente los datos.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-zinc-900">Expediente no encontrado</h1>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 p-8">
-      {/* Encabezado del Paciente */}
-      <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="flex flex-col gap-6 p-8 print:p-0 print:bg-white">
+      
+      {/* ENCABEZADO DEL PACIENTE (Oculto al imprimir) */}
+      <div className="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 bg-umi-blue/10 rounded-full flex items-center justify-center text-umi-blue">
             <User className="h-8 w-8" />
@@ -59,14 +67,13 @@ export default async function ExpedientePacientePage({ params }: Props) {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="text-zinc-600 bg-white">Editar Perfil</Button>
           <Button className="bg-umi-blue hover:bg-indigo-900 text-white">Alta Médica</Button>
         </div>
       </div>
 
-      {/* Pestañas del Expediente */}
+      {/* PESTAÑAS DEL EXPEDIENTE */}
       <Tabs defaultValue="historia" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-zinc-100 p-1 rounded-lg">
+        <TabsList className="grid w-full grid-cols-3 bg-zinc-100 p-1 rounded-lg print:hidden">
           <TabsTrigger value="historia" className="data-[state=active]:bg-white data-[state=active]:text-umi-blue">
             <FileText className="w-4 h-4 mr-2" /> Historia Clínica
           </TabsTrigger>
@@ -78,16 +85,21 @@ export default async function ExpedientePacientePage({ params }: Props) {
           </TabsTrigger>
         </TabsList>
 
-        <div className="mt-6 min-h-[500px]">
-          <TabsContent value="historia">
-            <HistoriaClinicaForm paciente={paciente} />
+        <div className="mt-6 min-h-[500px] print:mt-0">
+          
+          <TabsContent value="historia" className="print:m-0">
+            {/* Aquí mandamos el paciente cargado al formulario para que se auto-llene */}
+            <HistoriaClinicaForm paciente={paciente} fisioActual={fisioActual} />
           </TabsContent>
-          <TabsContent value="evolucion">
-            <EvolucionTimeline />
+          
+          <TabsContent value="evolucion" className="print:hidden">
+            <EvolucionTimeline pacienteId={paciente.id} fisioActual={fisioActual} />
           </TabsContent>
-          <TabsContent value="archivos" className="bg-white p-6 rounded-xl border border-zinc-200 text-center text-zinc-500 py-10">
-            <p>Módulo de archivos (Próximamente)</p>
+          
+          <TabsContent value="archivos" className="print:hidden mt-6">
+            <GestorArchivos pacienteId={paciente.id} fisioActual={fisioActual} />
           </TabsContent>
+
         </div>
       </Tabs>
     </div>

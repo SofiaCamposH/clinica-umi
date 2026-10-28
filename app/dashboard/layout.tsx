@@ -1,10 +1,22 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/Sidebar";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // 1. Verificación de seguridad de Supabase
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Si no hay usuario activo, lo regresamos al login
+  if (!user) {
+    redirect("/login");
+  }
+
+  // 2. Tu diseño exacto del Dashboard
   return (
     <div className="flex min-h-screen bg-white">
       {/* Menú Lateral Fijo */}

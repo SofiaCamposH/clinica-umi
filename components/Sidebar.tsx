@@ -4,9 +4,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { FolderOpen, FileImage, ClipboardList, LogOut, FilePlus } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const supabase = createClient();
 
   const menuItems = [
     { name: "Expedientes Clínicos", href: "/dashboard", icon: FolderOpen, badge: "Activo" },
@@ -15,20 +17,28 @@ export function Sidebar() {
     { name: "Bitácora de Asistencia", href: "/dashboard/bitacora", icon: ClipboardList, badge: "Hoy" },
   ];
 
+  // Función real para cerrar sesión
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login"; // Redirige al login limpiando el estado
+  };
+
   return (
     <div className="flex h-screen w-64 flex-col border-r border-zinc-200 bg-white px-3 py-4 shadow-sm print:hidden">
       
-      {/* Logotipo Oficial con Imagen */}
+      {/* Logotipo Oficial con Imagen (AHORA CLICABLE) */}
       <div className="mb-6 px-3 py-2">
-        <div className="relative h-12 w-32">
-          <Image
-            src="/logo-umi.png"
-            alt="Logo Clínica UMI"
-            fill
-            className="object-contain object-left"
-            priority
-          />
-        </div>
+        <Link href="/dashboard" className="block cursor-pointer hover:opacity-80 transition-opacity">
+          <div className="relative h-12 w-32">
+            <Image
+              src="/logo-umi.png"
+              alt="Logo Clínica UMI"
+              fill
+              className="object-contain object-left"
+              priority
+            />
+          </div>
+        </Link>
       </div>
 
       <div className="px-3 mb-2 mt-2">
@@ -79,7 +89,10 @@ export function Sidebar() {
           <span>☁ UMI Cloud Sync v2.4</span>
           <span>BD: 33ms</span>
         </div>
-        <button className="flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-red-50 hover:text-red-600 transition-colors">
+        <button 
+          onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+        >
           <LogOut className="h-4 w-4" />
           Cerrar Sesión
         </button>
