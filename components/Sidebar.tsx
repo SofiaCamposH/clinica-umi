@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { FolderOpen, FileImage, ClipboardList, LogOut, FilePlus } from "lucide-react";
+import { FolderOpen, FileImage, ClipboardList, LogOut, FilePlus, UserCircle, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export function Sidebar() {
@@ -15,18 +15,19 @@ export function Sidebar() {
     { name: "Nueva Historia Clínica", href: "/dashboard/nueva-historia", icon: FilePlus },
     { name: "Solicitud de Imagenología", href: "/dashboard/imagenologia", icon: FileImage },
     { name: "Bitácora de Asistencia", href: "/dashboard/bitacora", icon: ClipboardList, badge: "Hoy" },
+    { name: "Formato Membretado", href: "/dashboard/formato-membretado", icon: FileText },
+    { name: "Mi Perfil", href: "/dashboard/perfil", icon: UserCircle },
   ];
 
-  // Función real para cerrar sesión
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/login"; // Redirige al login limpiando el estado
+    window.location.href = "/login";
   };
 
   return (
-    <div className="flex h-screen w-64 flex-col border-r border-zinc-200 bg-white px-3 py-4 shadow-sm print:hidden">
+    <div className="flex h-screen w-64 flex-col border-r border-zinc-200 bg-white px-3 py-4 shadow-sm print:hidden sticky top-0">
       
-      {/* Logotipo Oficial con Imagen (AHORA CLICABLE) */}
+      {/* Logotipo Oficial */}
       <div className="mb-6 px-3 py-2">
         <Link href="/dashboard" className="block cursor-pointer hover:opacity-80 transition-opacity">
           <div className="relative h-12 w-32">
@@ -48,7 +49,6 @@ export function Sidebar() {
       {/* Navegación */}
       <nav className="flex-1 space-y-1">
         {menuItems.map((item) => {
-          // Detectar si estamos en la ruta exacta o dentro de una sub-ruta del módulo
           const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/dashboard');
           const isDashboardRoot = pathname === '/dashboard' && item.href === '/dashboard';
           const isReallyActive = isActive || isDashboardRoot;
